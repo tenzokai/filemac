@@ -1,3 +1,6 @@
 filemac
 *.cat
 *.linkcat
+docs/flyer.md
+docs/spec.txt
+docs/breakdown.md
