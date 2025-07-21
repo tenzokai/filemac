@@ -10,21 +10,64 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/peterh/liner"
 	"github.com/tenzokai/filemac/pkg/catalog"
 )
 
 // List unique tags
 func CmdListTags() {
-	entries, err := catalog.LoadCatalog()
-	if err != nil {
-		fmt.Println("catalog error:", err)
-		return
-	}
+	cwd, _ := os.Getwd()
+	catPath := filepath.Join(cwd, ".cat")
+	linkPath := filepath.Join(cwd, ".catlink")
 	tagSet := make(map[string]struct{})
-	for _, ent := range entries {
-		for _, tag := range ent.Tags {
-			tagSet[tag] = struct{}{}
+	catExists := func(file string) bool {
+		s, err := os.Stat(file)
+		return err == nil && !s.IsDir()
+	}
+	// Try local .cat
+	if catExists(catPath) {
+		entries, err := catalog.LoadCatalog()
+		if err != nil {
+			fmt.Println("catalog error:", err)
+			return
 		}
+		for _, ent := range entries {
+			for _, tag := range ent.Tags {
+				tagSet[tag] = struct{}{}
+			}
+		}
+	} else if catExists(linkPath) {
+		// Aggregate tags from all linked cats
+		f, err := os.Open(linkPath)
+		if err != nil {
+			fmt.Println("could not open .catlink:", err)
+			return
+		}
+		defer f.Close()
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			dir := strings.TrimSpace(scanner.Text())
+			if dir == "" {
+				continue
+			}
+			catfile := filepath.Join(dir, ".cat")
+			s, err := os.Stat(catfile)
+			if err != nil || s.IsDir() {
+				continue
+			}
+			entries, err := catalog.LoadCatalogAt(catfile)
+			if err != nil {
+				continue
+			}
+			for _, ent := range entries {
+				for _, tag := range ent.Tags {
+					tagSet[tag] = struct{}{}
+				}
+			}
+		}
+	} else {
+		fmt.Println("(no .cat or .catlink found, no tags)")
+		return
 	}
 	var tags []string
 	for tag := range tagSet {
@@ -345,7 +388,7 @@ func CmdSearch(tags []string) {
 
 	cwd, _ := os.Getwd()
 	catPath := filepath.Join(cwd, ".cat")
-	linkPath := filepath.Join(cwd, ".linkcat")
+	linkPath := filepath.Join(cwd, ".catlink")
 
 	if catExists(catPath) {
 		entries, err := catalog.LoadCatalog()
@@ -363,7 +406,7 @@ func CmdSearch(tags []string) {
 		// Search all referenced .cat files
 		f, err := os.Open(linkPath)
 		if err != nil {
-			fmt.Println("could not open .linkcat:", err)
+			fmt.Println("could not open .catlink:", err)
 			return
 		}
 		defer f.Close()
@@ -390,8 +433,8 @@ func CmdSearch(tags []string) {
 		}
 		return
 	}
-	// Neither .cat nor .linkcat
-	fmt.Printf("(No .cat or .linkcat found in %s)\n", cwd)
+	// Neither .cat nor .catlink
+	fmt.Printf("(No .cat or .catlink found in %s)\n", cwd)
 }
 
 // Like LoadCatalog but at arbitrary filename
@@ -419,7 +462,11 @@ func readCatalogAt(filename string) ([]catalog.CatEntry, error) {
 
 // CmdSearchLoop: interactive search and open
 func CmdSearchLoop() {
-	reader := bufio.NewReader(os.Stdin)
+	line := liner.NewLiner()
+	defer line.Close()
+	line.SetCtrlCAborts(true)
+	var history []string
+	//reader := bufio.NewReader(os.Stdin)
 
 	type Match struct {
 		Tags []string
@@ -454,7 +501,7 @@ func CmdSearchLoop() {
 		matches = matches[:0]
 		cwd, _ := os.Getwd()
 		catfile := filepath.Join(cwd, ".cat")
-		linkfile := filepath.Join(cwd, ".linkcat")
+		linkfile := filepath.Join(cwd, ".catlink")
 		catExists := func(file string) bool {
 			s, err := os.Stat(file)
 			return err == nil && !s.IsDir()
@@ -502,7 +549,7 @@ func CmdSearchLoop() {
 		} else if catExists(linkfile) {
 			f, err := os.Open(linkfile)
 			if err != nil {
-				fmt.Println("could not open .linkcat:", err)
+				fmt.Println("could not open .catlink:", err)
 				return
 			}
 			defer f.Close()
@@ -533,7 +580,7 @@ func CmdSearchLoop() {
 			}
 			return
 		}
-		fmt.Println("(No .cat or .linkcat found in current dir)")
+		fmt.Println("(No .cat or .catlink found in current dir)")
 	}
 
 	fmt.Println("Interactive search loop. Enter:")
@@ -541,17 +588,19 @@ func CmdSearchLoop() {
 	fmt.Println("    o <n> | o <path>       to open match")
 	fmt.Println("    q                      to quit")
 	for {
-		fmt.Print("SearchLoop> ")
-		line, err := reader.ReadString('\n')
+		input, err := line.Prompt("SearchLoop> ")
 		if err != nil {
-			fmt.Println("Read error:", err)
+			fmt.Println()
 			return
 		}
-		line = strings.TrimSpace(line)
-		if line == "" {
+		input = strings.TrimSpace(input)
+		if input == "" {
 			continue
 		}
-		parts := strings.Fields(line)
+		line.AppendHistory(input)
+		history = append(history, input)
+		parts := strings.Fields(input)
+
 		if len(parts) == 0 {
 			continue
 		}

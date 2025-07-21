@@ -1,164 +1,117 @@
-# filemac Usage Guide
+Managing personal and business documents can quickly become overwhelming as their number grows. Many of these files — often PDFs or scanned images — arrive in a continuous flow: scanned paperwork, email attachments, or downloaded forms, each named by date and a few identifying keywords such as topic, person, or year (e.g., `2023-12-01_Steuerbescheid.pdf`, `2024-05-02_Haftpflichtversicherung.pdf`). Over time, this results in a chronological archive that can be difficult to search just by filename.
 
-`filemac` is a native macOS CLI tool for lightweight tagging & cataloging of files and URLs in your folders.
+While macOS provides built-in file tagging, its functionality and workflows may not fit all needs — especially for those who prefer a fast, terminal-based workflow or require flexible, folder-local catalogs. This is where **filemac** comes in.
+
+**filemac** is a simple, native command-line tool to help you quickly tag, catalog, and retrieve documents stored in such folder structures. It enables you to assign and manipulate tags for files and URLs, all managed through a minimal `.cat` file in each directory. With commands to search, list, and update tags, `filemac` helps you cut through the noise and find documents using meaningful keywords, right from the terminal.
+
+Whether your workflow involves dumping scans into date-named files or archiving diverse documents under project folders, `filemac` makes it easy to organize and query your personal archive without relying on heavyweight or proprietary solutions.
+
+# filemac
 
 
-## Command Structure
+Native macOS interactive file catalog/tagging shell for quickly tagging, organizing, and searching documents in your folders.
 
-Commands are invoked as:
-```sh
-filemac -<command> [args...]
-```
+## Building
 
---
+Requires Go 1.20+ (developed on Go 1.24, darwin/arm64).
 
-## Commands & Options
-
-### Directory/Listing
-
-#### `-cd <path>`
-Change directory (to `<path>`). Will be created if missing.
-
-#### `-ls`
-List visible (non-dot) files/directories in current directory.
-
---
-
-### Catalog Operations
-
-#### `-vc`
-View the `.cat` file:
-- If missing, creates it.
-- Output:
-  ```
-  num    | type  | name                                 | tags
-  1      | file  | 2007-07-11_Jakob-Kindergeld.pdf      | jakob, kindergeld
-  2      | url   | https://google.com                   | any, query
-  ```
-#### `-vl`
-View the `.linkcat` file:
-- Lists all referenced folder paths, one per line.
-- If missing, prints: `No .linkcat in <abs-path-to-folder>`
-  (Empty if none)
-
-#### `-lt`
-List all unique tags (sorted, one per line).
-
---
-
-### Tag Operations
-
-#### `-a <num> <tag>`
-Add tag `<tag>` to entry `<num>`. No-op if already present.
-
-#### `-ax <tag>`
-Add tag `<tag>` to all entries. Does nothing to those already containing the tag.
-
-#### `-d <num> <tag>`
-Remove tag `<tag>` from entry `<num>`. Warns if not present.
-
-#### `-dx <tag>`
-Remove tag `<tag>` from all entries.
-
-#### `-r <num> <tag1> <tag2>`
-Replace tag `<tag1>` with `<tag2>` in entry `<num>`.
-
-#### `-rx <tag1> <tag2>`
-Replace tag `<tag1>` with `<tag2>` in all entries.
-
---
-
-### Walkthrough Mode
-
-#### `-w [<num>]`
-Step through entries interactively, starting at specified number (default: 1).
-
-Walkthrough steps:
-- Show entry and current tags
-- Prompt: `Enter tags:` (comma-separated; new set replaces old; blank to skip)
-- Confirm: `Correct? y/n` (repeat input if "n")
-- Type `stop` to abort early – last changed entry and unfinished count shown
-
---
-
-### Linking/Linked Directory Search
-
-#### `-link <path1> <path2> ...`
-Creates `.linkcat` referencing folders line by line. Used for cross-folder catalog search.
-
-#### `-s <tag1> <tag2> ...`
-
-List all entries matching ALL tags (AND search). You can exclude tags by prefixing them with `!` (negation). For example:
-
-   filemac -s travel !private
-Matches all entries tagged with `travel` and NOT tagged with `private`. You can chain as many includes and excludes as needed (evaluation is AND across all terms).
-
-- If directory has `.cat`, search it.
-- Else if `.linkcat`, search each referenced folder’s `.cat`.
-- If neither: prints warning.
-
-Result example:
-```
-/absolute/path/to/file
-tag1, tag2, tag3
-
-/absolute/path/to/otherfile
-tag2, tag4
-```
-
-## Notes & Conventions
-
-- Catalog entries: `<name>*<tag1>*<tag2>...`
-- Entry numbers correspond to the listing in `-vc`
-- Tags are always deduplicated per entry
-- Modifications write `.cat` atomically (full-rewrite)
-
-## Example Workflow
+To build the CLI binary:
 
 ```sh
-# Change/create directory
-filemac -cd docs
-
-# List files in this directory
-filemac -ls
-
-# View catalog, see entry numbers
-filemac -vc
-
-# Add tag “travel” to entry 2
-filemac -a 2 travel
-
-# Remove tag “work” from entry 1
-filemac -d 1 work
-
-# Start step-by-step interactive tagging
-filemac -w
-
-# Add a tag to all
-filemac -ax family
-
-# Replace a tag across all
-filemac -rx child kid
-
-# Search for entries matching BOTH “family” and “2025”
-filemac -s family 2025
+go build -o filemac ./cmd/filemac
 ```
+
+Or via Makefile:
+
+```sh
+make build
+```
+
+## Running
+
+
+## Usage
+
+After building, run:
+
+```sh
+./filemac
+```
+
+You'll enter an interactive shell (`filemac [cwd]>`) where you enter commands directly:
+
+#### Catalog sync (do after adding/removing files!):
+    i           # or: init
+        Scan working directory: adds all visible files to .cat, removes vanished ones
+
+#### Navigation/display:
+    cd <path>   # Change directory (supports ~ expansion)
+    ls          # List files in directory as a table (numbered)
+        num    | type  | name
+        1      | file  | example.pdf
+    vc          # View catalog (.cat), numbers here are for tag operations
+    vc -new     # Show only files and URLs with no tags yet (new entries)
+    vl          # View .catlink file (linked folders)
+    lt          # List all unique tags (from .cat, or from linked dirs if only .catlink)
+
+#### Tag & catalog management:
+    a <num> <tag>      # Add tag to catalog entry (as numbered in 'vc')
+    ax <tag>           # Add tag to all catalog entries
+    d <num> <tag>      # Remove tag from entry
+    dx <tag>           # Remove tag from all
+    r <num> <t1> <t2>  # Replace tag t1 with t2 in entry
+    rx <t1> <t2>       # Replace tag t1 with t2 in all entries
+    w [<num>]          # Walkthrough/interactive tag fixer
+    link <path...>     # Create or overwrite .catlink file with absolute paths
+
+#### Search:
+    s <tag...>         # Search for ALL tags (AND, use !tag to exclude)
+        e.g. s work 2023 !private
+    sl                 # Interactive search loop (search, open file, repeat/quit)
+
+#### Housekeeping:
+    help               # Show command list
+    quit, exit         # Exit shell
 
 ---
-**Platform:** Tested on macOS aarch64 (Apple Silicon). Requires Go if building from source.
-#### `-sl`
-Interactive search loop. Shows results like this:
 
-   1 tag1 tag2 ...
-   /abs/path/to/file1
-   2 tag3 tag4 ...
-   /abs/path/to/file2
+**Important:** Always run `i` (or `init`) when you add, remove, or move files using the OS, before performing tag operations! This will sync the working set with the `.cat` and keep numbers/tags consistent.
 
-Loop commands:
+**History:** All loops (main and search) support up/down arrow for in-session history browsing and editing.
+
+**.catlink**: replaces `.linkcat`. Use `link ...` to create/update, not by hand.
+
+View (`vc`, `lt`, `vl`) never create or modify files. Tag add/remove only changes `.cat`. To create a `.cat`, use `init` first.
+
+---
+
+## Example session
+
 ```
-- s [!]<tag1> [!]<tag2> ...   (re)search with AND/NOT terms
-- o <number>   open n-th result file
-- o <path>     open result file by full path
-- q            quit search loop
+$ ./filemac
+filemac [~/docs]> ls
+num    | type  | name
+1      | file  | Urlaub.pdf
+2      | file  | Rechnung-scan.pdf
+filemac [~/docs]> i
+.cat synchronized: 2 added, 0 removed
+filemac [~/docs]> vc
+num    | type  | name                | tags
+1      | file  | Urlaub.pdf          |
+2      | file  | Rechnung-scan.pdf   |
+filemac [~/docs]> a 1 travel
+tag 'travel' added to entry 1
+filemac [~/docs]> ax processed
+tag 'processed' added to 2 entries
+filemac [~/docs]> vc
+num    | type  | name                | tags
+1      | file  | Urlaub.pdf          | travel, processed
+2      | file  | Rechnung-scan.pdf   | processed
+filemac [~/docs]> s travel
+/Users/alex/docs/Urlaub.pdf
+travel, processed
+
+filemac [~/docs]> help
+# ...command list as above...
+filemac [~/docs]> quit
 ```
-If you try to open a URL or non-file, a warning is shown.

@@ -96,7 +96,19 @@ func CmdLs() {
         fmt.Printf("CmdLs: error reading directory: %v\n", err)
         return
     }
+    fmt.Printf("num    | type  | name\n")
+    n := 1
     for _, name := range names {
-        fmt.Println(name)
+        t := "file"
+        if isURL(name) {
+            t = "url"
+        }
+        fmt.Printf("%-6d | %-5s | %s\n", n, t, name)
+        n++
     }
+}
+
+// isURL checks if name looks like a URL (for ls output)
+func isURL(str string) bool {
+    return (len(str) > 7 && (str[:7] == "http://" || str[:8] == "https://"))
 }

@@ -1,6 +1,8 @@
 filemac
 *.cat
-*.linkcat
+*.catlink
+*.catlink
 docs/flyer.md
 docs/spec.txt
 docs/breakdown.md
+patch.txt
