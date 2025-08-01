@@ -121,4 +121,6 @@ steuer, 2024
 
 A future version will support semi-automatic tagging. Users will provide a list of tags, and filemac will use a locally stored pre-trained classification model — expected to support several European languages — along with a lightweight inference interface. This will enable automatic tagging of common file types such as txt, pdf, docx, xlsx, and others.
 
-tenzoki, July 2025
+## License
+
+This project is licensed under the [European Union Public Licence v1.2 (EUPL)](https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12).
